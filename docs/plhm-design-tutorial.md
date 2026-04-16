@@ -1,35 +1,42 @@
-# PLHM 设计教程
+# PLHM 架构设计教程
 
-## 1. 先用一句话说清这个项目
+## 1. 这个项目到底在做什么
 
-这个项目本质上是在演示一件事：
+PLHM 是一个刻意做得很小的训练项目。它的业务内容非常简单：
 
-> 用 `PyTorch` 写核心训练对象，用 `Lightning` 接管训练循环，用 `Hydra` 负责配置入口，用 `MLflow` 负责实验记录，并且尽量让这四部分彼此隔离。
-
-所以 `PLHM` 其实可以直接理解为：
-
-- `P`: PyTorch
-- `L`: Lightning
-- `H`: Hydra
-- `M`: MLflow
-
-当前代码不是把这四个框架平铺在一个文件里，而是刻意分层，把它们放在不同职责的模块里。
-
-## 2. 这个项目到底在训练什么
-
-业务本身非常简单，目的是让架构问题更容易看清：
-
-- 数据是一个二维二分类的高斯点云数据集
+- 数据是二维二分类的高斯点云
 - 模型是一个小型 MLP
 - 训练通过 Lightning 的 `Trainer.fit(...)` 运行
 - 配置从 Hydra 进入
-- 超参数和运行信息记录到 MLflow
+- 实验记录交给 MLflow
 
-也就是说，项目故意把“机器学习问题”简化成一个最小例子，好让你把注意力放在“软件结构”而不是“算法细节”上。
+之所以把例子做得这么小，不是因为项目目标小，而是因为这里真正要展示的是架构：
 
-## 3. 总体架构图
+> 当一个训练项目同时用了 PyTorch、Lightning、Hydra、MLflow，怎样拆才能不把代码写成一个大泥球。
 
-当前项目最重要的设计，不是模型有多复杂，而是依赖方向。
+## 2. P/L/H/M 不是四个库名，而是四类职责
+
+PLHM 里的四个字母可以直接这样理解：
+
+- `P` = PyTorch
+- `L` = Lightning
+- `H` = Hydra
+- `M` = MLflow
+
+但更重要的是，它们在这个项目里分别代表四类职责：
+
+- `P` 负责训练核心：模型、张量、数据
+- `L` 负责训练流程：step、optimizer、dataloader 生命周期
+- `H` 负责配置入口：默认值、命令行覆盖、配置装载
+- `M` 负责实验记录：tracking URI、logger、超参数记录
+
+如果只把它们理解成“用了四个框架”，那这个项目就很普通。
+
+如果把它们理解成“四类职责必须分开”，你才会真正明白这个仓库为什么要这样写。
+
+## 3. 当前代码的总体形状
+
+先看最重要的依赖方向：
 
 ```text
 main.py
@@ -37,134 +44,101 @@ main.py
   -> settings.py
   -> app.py
        -> runtime.py
+       -> pytorch/
+       -> lightning/
        -> mlflow.py
        -> integrations/lightning_mlflow.py
-       -> lightning/
-            -> pytorch/
 ```
 
-如果换成更抽象的话术，就是：
+这张图里最关键的不是文件数量，而是方向：
 
-- `PyTorch` 是核心训练对象层
-- `Lightning` 是训练循环适配层
-- `Hydra` 是配置输入适配层
-- `MLflow` 是实验记录适配层
-- `app.py` 是唯一允许“把这些层组装起来”的地方
+- `main.py` 只负责进门
+- `hydra_loader.py` 只负责把 Hydra 对象翻译成项目对象
+- `settings.py` 定义项目自己的配置语言
+- `app.py` 是 Composition Root
+- `pytorch/` 是训练核心
+- `lightning/` 是训练适配器
+- `mlflow.py` 和 `integrations/` 是实验记录边界
 
-这里最关键的一条规则是：
+这意味着：
 
-> 框架之间不要到处互相 import，跨框架组装只能集中发生在一个很小的地方。
+> 不是每一层都能知道所有东西，只有 Composition Root 可以看到全局。
 
-这个“小地方”就是 [plhm/app.py](/root/PLHM/plhm/app.py:1)。
+## 4. 为什么要有 Composition Root
 
-## 4. 代码按什么原则拆的
+这个项目里最关键的文件是 [`plhm/app.py`](../plhm/app.py)。
 
-当前拆分遵循的是经典的“核心逻辑 + 适配器 + 组装层”。
+它的地位不是“主逻辑文件”，而是 Composition Root，也就是唯一负责“总装”的地方。
 
-### 4.1 核心层
+在这个文件里，项目完成了这些动作：
 
-核心层只表达“训练本身需要什么”，而不表达“用哪个框架跑”。
-
-对应文件：
-
-- [plhm/pytorch/model.py](/root/PLHM/plhm/pytorch/model.py:1)
-- [plhm/pytorch/data.py](/root/PLHM/plhm/pytorch/data.py:1)
-- [plhm/settings.py](/root/PLHM/plhm/settings.py:1)
-
-这层的目标是：
-
-- 让数据和模型能独立理解
-- 让配置结构先变成普通 dataclass
-- 尽量不把 Hydra、MLflow 之类的基础设施概念带进来
-
-### 4.2 适配层
-
-适配层负责“把核心层接到某个框架上”。
-
-对应文件：
-
-- [plhm/lightning/module.py](/root/PLHM/plhm/lightning/module.py:1)
-- [plhm/lightning/datamodule.py](/root/PLHM/plhm/lightning/datamodule.py:1)
-- [plhm/hydra_loader.py](/root/PLHM/plhm/hydra_loader.py:1)
-- [plhm/mlflow.py](/root/PLHM/plhm/mlflow.py:1)
-- [plhm/integrations/lightning_mlflow.py](/root/PLHM/plhm/integrations/lightning_mlflow.py:1)
-
-这层的目标是：
-
-- 把 Hydra 配置转成普通 Python 对象
-- 把 PyTorch 模型包装成 LightningModule
-- 把 PyTorch 数据集包装成 LightningDataModule
-- 把 MLflow Logger 的构造单独收口
-
-### 4.3 组装层
-
-组装层只有一个：
-
-- [plhm/app.py](/root/PLHM/plhm/app.py:1)
-
-这个文件做的事情是：
-
-1. 拿到中立配置 `AppSettings`
-2. 推导运行时参数
+1. 拿到 `AppSettings`
+2. 推导运行时设置
 3. 构造 MLflow Logger
-4. 构造 DataModule
-5. 构造网络和 LightningModule
-6. 构造 `L.Trainer`
-7. 调用 `trainer.fit(...)`
-8. 收集并打印最终指标
+4. 构造 `GaussianBlobDataModule`
+5. 构造 `TinyClassifier`
+6. 构造 `ClassificationModule`
+7. 构造 `L.Trainer`
+8. 调用 `trainer.fit(...)`
+9. 收集最终指标
 
-换句话说：
+这里有一个很重要的工程原则：
 
-> 只有 `app.py` 有资格知道 “P、L、H、M 四部分最终怎么拼在一起”。
+> 耦合本身不是罪，分散的耦合才是罪。
 
-## 5. 从入口到训练结束，调用链如何流动
+`app.py` 允许耦合，因为它本来就是用来收口耦合的。真正要避免的是：
 
-这一段是新手最值得反复看的部分。
+- 在 `main.py` 拼一点
+- 在 `lightning/module.py` 再拼一点
+- 在 `mlflow.py` 再偷塞一点
 
-### 5.1 `main.py` 只做入口，不做业务
+那样最后你根本不知道项目真正的组装发生在哪里。
 
-[main.py](/root/PLHM/main.py:1) 很短，这正是设计目标。
+## 5. 从入口到训练完成，代码怎么流动
+
+### 5.1 `main.py` 只做入口
+
+[`main.py`](../main.py) 很短，这是刻意设计的结果。
 
 它只做三件事：
 
 1. 通过 `@hydra.main(...)` 接收配置
-2. 用 `load_app_settings(...)` 把 Hydra 的 `DictConfig` 转成普通 dataclass
+2. 调用 `load_app_settings(...)`
 3. 调用 `run_training(...)`
 
-这说明 `main.py` 没有直接碰：
+它不做这些事：
 
-- Lightning 训练细节
-- MLflow Logger 构造
-- PyTorch 模型定义
-- dataloader 参数推导
+- 不定义模型
+- 不创建 Logger
+- 不解析设备策略
+- 不构造 Trainer
 
-这就是第一层隔离：入口不承担业务。
+这样入口就不会变成“大控制器”。
 
-### 5.2 `hydra_loader.py` 把 Hydra 关在门口
+### 5.2 `hydra_loader.py` 把 Hydra 挡在边界上
 
-[plhm/hydra_loader.py](/root/PLHM/plhm/hydra_loader.py:1) 的作用非常关键。
+[`plhm/hydra_loader.py`](../plhm/hydra_loader.py) 的职责非常纯粹：
 
-Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个对象在项目里到处流动，会产生两个问题：
+- 接收 Hydra 的 `DictConfig`
+- 转成普通 `dict`
+- 再转成 `AppSettings`
 
-- 每一层都被迫理解 Hydra
-- 你以后想换配置系统会非常痛苦
+这一步的意义非常大，因为 Hydra 的 `DictConfig` 虽然好用，但它本质上仍然是框架对象。
 
-所以这里做了一个很重要的动作：
+如果你让它一路传进模型层、训练层、日志层，会出现两个问题：
 
-- `DictConfig` -> `dict`
-- `dict` -> `AppSettings`
+1. 每一层都开始依赖 Hydra
+2. 以后要换配置系统时，重构成本会陡增
 
-也就是把配置从“框架对象”转换成“项目自己的对象”。
+所以这个项目的做法是：
 
-一旦 `AppSettings` 生成完成，后面的绝大多数代码就不需要知道 Hydra 还存在。
+> Hydra 对象一进门就被翻译成项目自己的对象。
 
-这就是第二层隔离：配置框架只出现在入口适配层。
+这是 `H` 层最重要的边界。
 
-### 5.3 `settings.py` 定义项目自己的语言
+### 5.3 `settings.py` 定义项目内部协议
 
-[plhm/settings.py](/root/PLHM/plhm/settings.py:1) 不是一个装饰性文件，它其实是项目的“内部配置协议”。
-
-里面定义了：
+[`plhm/settings.py`](../plhm/settings.py) 定义了：
 
 - `DataSettings`
 - `ModelSettings`
@@ -172,389 +146,319 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 - `MlflowSettings`
 - `AppSettings`
 
-这意味着项目后面的代码不是围绕 Hydra 的结构编程，而是围绕自己定义的 dataclass 编程。
+这几个 dataclass 的价值不只是“好看”，而是它们让项目后面的代码都围绕自己的协议工作，而不是围绕 Hydra 的协议工作。
 
-这样做的价值是：
+这会带来几个直接收益：
 
-- IDE 补全更明确
 - 类型更清楚
-- 每个子域的边界更明显
-- 配置系统以后更容易替换
+- IDE 补全更稳定
+- 配置结构更可读
+- 子模块边界更明确
 
-这就是第三层隔离：内部代码依赖项目协议，不依赖外部配置协议。
+简单说：
 
-### 5.4 `app.py` 是 Composition Root，不是业务细节仓库
+> `settings.py` 让项目拥有了自己的语言。
 
-[plhm/app.py](/root/PLHM/plhm/app.py:1) 现在承担的是 Composition Root。
+### 5.4 `runtime.py` 负责“根据环境做决定”
 
-它知道所有部件怎么连，但它不应该承载每个部件的具体细节。
+[`plhm/runtime.py`](../plhm/runtime.py) 负责把配置和机器状态组合起来，得到真正用于训练的运行时设置。
 
-你可以把它理解为“总装车间”：
+它处理的内容包括：
 
-- `settings` 提供零件规格
-- `runtime` 提供运行时推导
-- `pytorch` 提供核心零件
-- `lightning` 提供训练底盘
-- `mlflow` 提供记录系统
-- `integrations` 提供跨框架胶水
+- accelerator 的选择
+- devices 的解析
+- precision 的选择
+- strategy 的推导
+- dataloader worker 数量的推导
 
-然后 `app.py` 把它们拼成一辆能跑的车。
+这层存在的意义是：不要把这些环境决策散在 `main.py`、`app.py`、`lightning/module.py` 里。
 
-所以 `app.py` 允许知道很多模块，但别的模块不应该反过来知道 `app.py` 里面的全局拼装信息。
+否则以后你一旦需要：
 
-这就是第四层隔离：组装知道一切，零件不知道全局。
+- 切换 CPU/GPU
+- 增加多卡策略
+- 调整 BF16/FP16
 
-## 6. P、L、H、M 四个模块现在分别承担什么职责
+这些判断就会四处蔓延。
 
-这一节是你以后判断“代码放哪”最实用的标准。
+## 6. P/L/H/M 四层各自应该负责什么
 
-### 6.1 P: PyTorch 层
+这一节是这个项目最核心的阅读方式。
 
-对应：
+### 6.1 P 层：PyTorch 只负责训练核心
 
-- [plhm/pytorch/model.py](/root/PLHM/plhm/pytorch/model.py:1)
-- [plhm/pytorch/data.py](/root/PLHM/plhm/pytorch/data.py:1)
+对应文件：
 
-这层应该只负责：
+- [`plhm/pytorch/model.py`](../plhm/pytorch/model.py)
+- [`plhm/pytorch/data.py`](../plhm/pytorch/data.py)
 
-- 张量如何构造
-- 数据集如何产生
-- 网络结构如何定义
-- 前向计算如何发生
+P 层应该负责：
 
-这层不应该负责：
+- 模型结构
+- 前向计算
+- 张量和数据集构造
+- 数据切分
 
-- Hydra 配置读取
-- Lightning 日志记录
-- MLflow Logger 创建
-- GPU/precision 策略选择
-- 训练生命周期回调
+P 层不应该负责：
 
-#### 当前优点
+- Hydra 配置装载
+- Lightning 生命周期
+- MLflow 记录逻辑
+- 设备和精度策略
+
+当前实现的优点很清楚：
 
 - `TinyClassifier` 是纯 `nn.Module`
-- `build_gaussian_blob_dataset(...)` 和 `build_gaussian_blob_splits(...)` 是纯 PyTorch 数据逻辑
-- 这层没有依赖 Hydra 和 MLflow
+- `build_gaussian_blob_dataset(...)` 是纯 PyTorch 数据逻辑
+- `build_gaussian_blob_splits(...)` 仍然保持在数据层，而没有溢出到训练框架里
 
-#### 当前还不够“极限隔离”的地方
+这意味着你要替换模型和数据时，可以先只动 `P` 层，不一定要碰 `L/H/M`。
 
-- 数据函数里把“训练/验证切分策略”也放在了 PyTorch 层
-- `TinyClassifier` 里仍然把输出类别数写死为 `2`
+### 6.2 L 层：Lightning 只是训练流程适配器
 
-这不算错误，但如果你追求更强隔离，可以继续拆成：
+对应文件：
 
-- `dataset_factory`
-- `split_policy`
-- `model_factory`
+- [`plhm/lightning/module.py`](../plhm/lightning/module.py)
+- [`plhm/lightning/datamodule.py`](../plhm/lightning/datamodule.py)
 
-### 6.2 L: Lightning 层
+L 层应该负责：
 
-对应：
+- `training_step` / `validation_step`
+- `configure_optimizers`
+- DataModule 形式
+- 与 Trainer 生命周期对接
 
-- [plhm/lightning/module.py](/root/PLHM/plhm/lightning/module.py:1)
-- [plhm/lightning/datamodule.py](/root/PLHM/plhm/lightning/datamodule.py:1)
+L 层不应该负责：
 
-这层应该只负责：
+- 自己定义业务模型
+- 自己决定配置来源
+- 自己创建 MLflow Logger
+- 自己推导硬件和精度策略
 
-- 把 PyTorch 对象接到 Lightning 生命周期
-- 管理 `training_step` / `validation_step`
-- 管理 `configure_optimizers`
-- 管理 dataloader 形式
+当前实现里有两个很好的地方：
 
-这层不应该负责：
+- `ClassificationModule` 接收 `network`
+- `GaussianBlobDataModule` 接收 `dataset_factory`
 
-- 直接定义业务模型结构
-- 解析 Hydra 配置
-- 决定 MLflow 的 Tracking URI
-- 推导全局 batch size
+这两个设计都在表达同一个意思：
 
-#### 当前优点
+> Lightning 不应该拥有训练核心，它只应该接住训练核心。
 
-- `ClassificationModule` 接收 `network` 和 `optimizer_config`，而不是自己内部创建网络
-- `GaussianBlobDataModule` 接收 `dataset_factory`，而不是自己写死数据生成逻辑
+这正是 `L` 层应有的边界。
 
-这是当前项目最值得保留的两个隔离点。
+### 6.3 H 层：Hydra 只负责把配置送进来
 
-它们意味着：
+对应文件：
 
-- 你可以替换网络，而不改 Lightning 训练循环
-- 你可以替换数据集，而不改 DataModule 的外壳
+- [`main.py`](../main.py)
+- [`plhm/hydra_loader.py`](../plhm/hydra_loader.py)
+- [`conf/config.yaml`](../conf/config.yaml)
 
-#### 当前还存在的耦合
+H 层应该负责：
 
-`ClassificationModule` 里仍然内嵌了：
+- 默认值
+- 命令行覆盖
+- 配置装载
+- 配置翻译
 
-- `CrossEntropyLoss`
-- accuracy 计算方式
-- log metric 的命名规则
+H 层不应该负责：
 
-如果以后任务从二分类变成多标签、多任务、回归，这里就会被迫改动。
+- 训练流程
+- 模型结构
+- Logger 创建
+- 数据逻辑
 
-所以更强的隔离方式是把下面这些继续外提：
+这一层最重要的不是“会不会写 Hydra”，而是“有没有把 Hydra 控制在边界上”。
 
-- `loss_fn`
-- `metrics_computer`
-- `log_naming_policy`
-- `optimizer_factory`
+当前项目在这件事上是做对了的，因为 `DictConfig` 没有继续向里层扩散。
 
-也就是让 LightningModule 更像一个“流程容器”，而不是“训练逻辑全集”。
+### 6.4 M 层：MLflow 只负责记录，不负责训练
 
-### 6.3 H: Hydra 层
+对应文件：
 
-对应：
+- [`plhm/mlflow.py`](../plhm/mlflow.py)
+- [`plhm/integrations/lightning_mlflow.py`](../plhm/integrations/lightning_mlflow.py)
 
-- [main.py](/root/PLHM/main.py:1)
-- [plhm/hydra_loader.py](/root/PLHM/plhm/hydra_loader.py:1)
-- [conf/config.yaml](/root/PLHM/conf/config.yaml:1)
-
-这层应该只负责：
-
-- 接收配置输入
-- 做默认值管理
-- 处理命令行覆盖参数
-- 在入口把配置翻译成项目内部对象
-
-这层不应该负责：
-
-- 训练循环
-- 模型定义
-- 实验日志写入
-- 数据集构造细节
-
-#### 当前优点
-
-- Hydra 没有深入业务层
-- `settings.py` 让项目内部不依赖 `DictConfig`
-- `conf/config.yaml` 结构和 `AppSettings` 对应得很清晰
-
-#### 当前还可以进一步优化的方向
-
-如果配置越来越复杂，可以继续把 Hydra 配置拆目录：
-
-```text
-conf/
-  config.yaml
-  data/
-  model/
-  trainer/
-  mlflow/
-```
-
-这样可以把“配置组合”也模块化。
-
-### 6.4 M: MLflow 层
-
-对应：
-
-- [plhm/mlflow.py](/root/PLHM/plhm/mlflow.py:1)
-- [plhm/integrations/lightning_mlflow.py](/root/PLHM/plhm/integrations/lightning_mlflow.py:1)
-
-这层应该只负责：
+M 层应该负责：
 
 - Tracking URI 构造
-- Logger 构造
-- 超参数扁平化
+- MLflow Logger 构造
+- 超参数展开和记录
 
-这层不应该负责：
+M 层不应该负责：
 
-- 决定模型如何训练
-- 决定训练跑在哪张卡
-- 决定数据如何产生
+- 模型定义
+- 训练 step
+- 硬件策略
+- 数据生成
 
-#### 当前优点
+这一层最关键的设计点不是 `mlflow.py` 本身，而是 `integrations/lightning_mlflow.py` 的存在。
 
-- `build_tracking_uri(...)` 被单独抽出
-- `build_mlflow_logger(...)` 被放进 Integration 层，而不是散落在入口或 LightningModule 里
+因为真正容易失控的不是“单一框架代码”，而是“跨框架胶水代码”。只要 Lightning 和 MLflow 的桥接代码被明确收口，项目就不会出现到处乱插 logger 调用的情况。
 
-这非常重要，因为 `Lightning` 和 `MLflow` 的耦合是“跨框架耦合”，最容易越写越乱。
+## 7. 这个项目现在已经做对了什么
 
-#### 当前还可以更强的地方
-
-如果未来你还要支持：
-
-- TensorBoard
-- Weights & Biases
-- CSV Logger
-
-那么更好的做法是再增加一层：
-
-- `experiment_logger_factory`
-
-让 `app.py` 不直接知道具体 Logger 类型，而只请求“一个实验记录器”。
-
-## 7. 当前设计为什么已经比很多 MVP 干净
-
-很多 MVP 的典型写法是把下面这些全部塞进 `main.py`：
+很多 MVP 的常见写法是把下面这些东西全部塞进一个 `main.py`：
 
 - 读配置
 - 定义模型
-- 定义 dataset
-- 构造 dataloader
-- 构造 trainer
-- 构造 Logger
+- 定义数据
+- 创建 dataloader
+- 创建 logger
+- 创建 trainer
 - 打印环境信息
-- 训练
-- 汇总指标
+- 开始训练
+- 汇总结果
 
-这样会导致四类耦合同时出现：
+这种写法的最大问题不是文件长，而是职责完全混在一起。
 
-1. 配置耦合
-2. 训练框架耦合
-3. 日志系统耦合
-4. 业务逻辑耦合
-
-当前项目已经避免了最严重的部分，因为它做到了：
+PLHM 当前已经避免了最糟糕的几种耦合：
 
 - 入口和组装分离
-- 框架配置和项目设置分离
-- 核心 PyTorch 代码和 Lightning 生命周期分离
-- MLflow 和训练主流程的耦合集中到 Integration 层
+- 配置对象和内部对象分离
+- PyTorch 核心和 Lightning 生命周期分离
+- MLflow 和训练流程的桥接代码单独收口
 
-这意味着它已经不是“单文件脚本”，而是一个真正有演进空间的最小架构。
+这说明它已经不是一个“能跑就行”的脚本，而是一个可以继续往上长的最小架构。
 
-## 8. 目前还剩下哪些真实耦合点
+## 8. 这个项目现在还耦合在哪里
 
-这里不讲理想化，只讲当前代码里仍然真实存在的耦合。
+说清优点不难，真正有价值的是把剩余耦合也讲清楚。
 
-### 8.1 `app.py` 是有意存在的“中心耦合点”
+### 8.1 `app.py` 是主动保留的集中耦合点
 
-这不是坏事。
+`app.py` 确实耦合很多模块，但这是设计结果，不是设计失败。
 
-Composition Root 本来就应该承担集中耦合。真正要避免的是：
+Composition Root 本来就应该知道：
 
-- 到处都有一点点耦合
+- 配置对象
+- 训练核心
+- 训练适配器
+- 日志适配器
+- 运行时设置
 
-而不是：
+只要这种全局耦合只出现在一个短小、稳定、容易读的文件里，它就是可接受的。
 
-- 有一个明确、可控、短小的耦合点
+### 8.2 `ClassificationModule` 仍然带着任务假设
 
-所以 `app.py` 的耦合是“好耦合”，因为它是被收口过的。
+现在的 `ClassificationModule` 里仍然直接内嵌了：
 
-### 8.2 `runtime.py` 仍然依赖 PyTorch 环境探测
+- `CrossEntropyLoss`
+- accuracy 计算
+- metric 名称规则
 
-[plhm/runtime.py](/root/PLHM/plhm/runtime.py:1) 里会调用：
+这说明它不只是 Lightning 适配器，它还是“分类任务适配器”。
+
+这没错，但如果以后项目要支持：
+
+- 多标签任务
+- 回归
+- 多任务训练
+
+你就会发现这里是一个真实的变化点。
+
+### 8.3 `runtime.py` 仍然直接依赖 PyTorch 环境探测
+
+`runtime.py` 会直接调用：
 
 - `torch.cuda.is_available()`
 - `torch.cuda.device_count()`
 - `torch.cuda.is_bf16_supported()`
 
-这意味着“运行时决策”目前仍然绑定了 PyTorch。
+这说明运行时策略和环境探测还在同一个模块里。
 
-如果你追求更高隔离，可以把这部分再拆成：
+如果以后你想把这层做得更极致，可以继续拆成：
 
 - `hardware_probe`
 - `runtime_policy`
 
-前者负责采集环境事实，后者负责根据事实做决策。
+这样“采集事实”和“根据事实做决策”就能分开。
 
-### 8.3 `reporting.py` 直接依赖 Lightning 和 Torch
+### 8.4 `reporting.py` 里仍然有框架知识
 
-[plhm/reporting.py](/root/PLHM/plhm/reporting.py:1) 里：
+[`plhm/reporting.py`](../plhm/reporting.py) 现在会直接碰：
 
-- `extract_final_metrics(...)` 依赖 `L.Trainer`
-- `print_banner(...)` 依赖 `torch`
+- `L.Trainer`
+- `torch`
 
-这说明“展示逻辑”还混合了一点框架知识。
+这说明“展示结果”和“框架对象”还没有彻底分离。
 
-更强的隔离方式是：
+如果项目继续长大，这里也可以继续拆成：
 
-- `environment_snapshot` 单独生成纯数据对象
-- `report_renderer` 只负责打印
+- `environment_snapshot`
+- `report_renderer`
 
-### 8.4 `ClassificationModule` 里把任务类型写死成分类任务
+## 9. 如果目标是“尽可能最隔离”，应该怎么想
 
-`CrossEntropyLoss` 和 accuracy 的组合其实代表：
+“最隔离”不能理解成“每个模块都完全不知道其他模块存在”，那是伪目标。
 
-> 这个 LightningModule 不只是一个通用训练容器，它还是一个“分类任务训练容器”。
+工程上更现实的目标应该是：
 
-如果以后项目变复杂，建议继续拆出：
+> 大部分模块只依赖抽象和数据对象，只有极少数边界模块依赖具体框架。
 
-- `TaskSpec`
-- `LossAdapter`
-- `MetricAdapter`
+围绕这个目标，可以用下面五条规则判断结构是否健康。
 
-## 9. 如果目标是“尽可能最隔离各个组件”，应该怎样构造
+### 规则 1：核心层不要依赖外部编排框架
 
-这一节是核心建议。
-
-如果你把“最隔离”理解成“每个模块都完全不知道其他模块存在”，那在工程里几乎做不到，也没必要。
-
-真正可行的目标应该是：
-
-> 让大部分模块只依赖抽象协议和数据对象，只有极少数边界模块依赖具体框架。
-
-可以用下面这套规则来判断结构是否足够隔离。
-
-### 规则 1：核心层不能 `import` 外部编排框架
-
-核心层通常指：
-
-- 模型定义
-- 数据定义
-- 任务规则
-- 配置 schema
-
-这层最好不要 import：
+模型、数据、任务规则、配置 schema 这些东西，尽量不要直接依赖：
 
 - Hydra
 - Lightning
 - MLflow
 
-当前项目已经基本做到。
+当前项目在这件事上已经做得不错。
 
-### 规则 2：所有框架对象都要尽早翻译成项目对象
+### 规则 2：框架对象尽早翻译成项目对象
 
 例如：
 
-- `DictConfig` 尽快变成 `AppSettings`
-- MLflow Logger 尽快变成一个组装好的实例
+- `DictConfig` 早一点变成 `AppSettings`
+- MLflow Logger 早一点构造成最终对象
 
-不要让框架原生对象在全项目到处漂流。
+不要让框架原生对象在整个项目里四处漂流。
 
 ### 规则 3：跨框架代码必须集中收口
 
-最危险的代码，不是 PyTorch 代码，也不是 Hydra 代码，而是下面这种：
+真正危险的代码通常不是单一框架代码，而是下面这种混合代码：
 
-- “先从 Hydra 读一段值，再传给 Lightning，再顺手记录到 MLflow”
+- 先从 Hydra 读配置
+- 再把值传给 Lightning
+- 再顺手送进 MLflow
 
-因为这属于多框架混合区。
+这种逻辑应该尽量只出现在：
 
-这类代码应该尽量只出现在：
-
-- `app.py`
+- Composition Root
 - `integrations/`
 
-### 规则 4：用依赖注入替代内部硬编码
+### 规则 4：优先依赖注入，不要优先内部硬编码
 
-比如当前项目里已经有两个不错的例子：
+当前项目已经有两个好例子：
 
 - `ClassificationModule(network=..., optimizer_config=...)`
 - `GaussianBlobDataModule(dataset_factory=...)`
 
-这就是依赖注入。
-
-继续往前走，你还可以注入：
+继续往前走，你还可以把下面这些东西继续注入：
 
 - `loss_fn`
-- `metrics`
+- `metrics_computer`
 - `optimizer_factory`
 - `scheduler_factory`
 - `experiment_logger_factory`
 
-### 规则 5：把“策略”从“流程”中拆开
+### 规则 5：把“流程”和“策略”拆开
 
-很多代码耦合，不是因为功能太多，而是因为把“流程”和“策略”揉在一起。
+很多耦合不是因为功能太多，而是因为把流程和策略混在一起。
 
 例如：
 
 - 流程：训练一个 batch
-- 策略：这个任务用什么 loss、怎么记 metric、怎么命名日志
+- 策略：这个任务用什么 loss，怎么记 metric，怎么命名日志
 
-如果流程不变，策略可能经常变，那就应该把策略单独抽象。
+如果流程相对稳定、策略经常变化，那策略就应该往外提。
 
-## 10. 一套更极致的隔离形态
+## 10. 如果继续往前走，可以演进成什么样
 
-如果未来你想把这个项目继续升级，可以朝下面这种结构演进：
+如果这个项目以后不只是教学样例，而是要继续承载更多实验，可以朝下面这类结构演进：
 
 ```text
 plhm/
@@ -584,23 +488,23 @@ plhm/
 main.py
 ```
 
-这套结构的意思是：
+这套结构的含义是：
 
-- `domain/`：只放领域对象和纯规则
-- `application/`：只放用例和流程编排
-- `adapters/`：专门对接框架
-- `integrations/`：专门放跨框架粘合逻辑
-- `bootstrap/`：专门做最终组装
+- `domain/` 放领域对象和纯规则
+- `application/` 放用例和流程编排
+- `adapters/` 放框架适配器
+- `integrations/` 放跨框架桥接逻辑
+- `bootstrap/` 放最终组装入口
 
-这会比当前结构更复杂，但在项目持续长大时更稳定。
+这会让项目比现在复杂一些，但规模继续增大时会更稳。
 
-## 11. 如果继续重构，这个项目最值得优先做的 6 步
+## 11. 下一阶段最值得做的 6 步重构
 
-这里给的是“收益最高”的顺序，不是理论上最漂亮的顺序。
+如果你想继续把 PLHM 做得更干净，我建议按这个顺序推进。
 
-### 第 1 步：把任务逻辑从 LightningModule 里再拆出来
+### 第 1 步：把任务逻辑从 LightningModule 里拆出去
 
-新建例如：
+例如增加：
 
 - `plhm/task/classification.py`
 
@@ -609,82 +513,80 @@ main.py
 - `compute_loss(...)`
 - `compute_metrics(...)`
 
-然后 `ClassificationModule` 只调用 task 对象。
+这样以后切换任务类型时，不需要直接大改 LightningModule。
 
-这样改完后：
+### 第 2 步：把优化器创建方式抽成工厂
 
-- 换任务类型时，不需要大改 LightningModule
+现在 `configure_optimizers()` 里直接写死了 `Adam`。
 
-### 第 2 步：把优化器构造变成工厂
-
-现在 `configure_optimizers()` 里写死了 `Adam`。
-
-可以改成：
+更合适的方向是：
 
 - `OptimizerFactory`
-- 或者一个简单的 `build_optimizer(model, optimizer_settings)`
+- 或者 `build_optimizer(model, optimizer_settings)`
 
-这样模型层、任务层、训练框架层之间的职责会更清楚。
+这样模型层、任务层、训练层的职责会更稳。
 
-### 第 3 步：把运行时探测和运行时策略分开
+### 第 3 步：把环境探测和运行时策略拆开
 
-现在 `runtime.py` 同时做了：
+现在 `runtime.py` 同时做了两件事：
 
-- 环境探测
-- 策略决策
+- 探测环境
+- 推导策略
 
-建议拆成：
+如果继续重构，可以拆成：
 
 - `probe_hardware()`
 - `resolve_runtime_policy(...)`
 
-这样测试会更容易写，也更方便以后支持别的硬件环境。
+### 第 4 步：把 Experiment Logger 再抽一层
 
-### 第 4 步：把 Experiment Logger 做成统一接口
+如果以后要支持不止一种记录方式，例如：
 
-例如抽象成：
+- MLflow
+- TensorBoard
+- W&B
+
+那就可以把 Logger 构造统一成：
 
 - `build_experiment_logger(settings, runtime)`
 
-内部再决定返回 MLflow、TensorBoard 还是别的实现。
-
-这样 `app.py` 不再直接感知具体实验平台。
+这样 Composition Root 只需要请求“一个实验记录器”，而不是直接知道具体实现。
 
 ### 第 5 步：把 Hydra 配置拆成 Config Groups
 
-当配置继续变多时，`conf/config.yaml` 会很快变臃肿。
+当配置开始变多时，单个 `conf/config.yaml` 很快就会变得臃肿。
 
-提前拆开会更清晰：
+更清楚的做法是拆成：
 
 - `conf/data/default.yaml`
 - `conf/model/mlp.yaml`
 - `conf/trainer/gpu.yaml`
 - `conf/mlflow/local.yaml`
 
-### 第 6 步：为“边界层”写单元测试
+### 第 6 步：给边界层补单元测试
 
-最值得测的不是框架本身，而是边界翻译逻辑：
+最值得测的，不是框架本身，而是边界翻译逻辑：
 
 - `hydra_loader.py`
 - `runtime.py`
 - `integrations/lightning_mlflow.py`
 
-因为这些地方最容易在重构时悄悄出错。
+这些地方最容易在重构时悄悄出错。
 
-## 12. 新功能应该放在哪里
+## 12. 日常开发时，代码应该放到哪里
 
-这是日常开发最常用的判断表。
+这部分最实用，因为它直接决定以后仓库会不会重新变乱。
 
 ### 想加新模型
 
-放在：
+优先放在：
 
 - `plhm/pytorch/`
 
-不要放在：
+不要直接塞进：
 
-- `lightning/module.py`
 - `main.py`
+- `plhm/lightning/module.py`
 
 ### 想换数据源
 
@@ -692,19 +594,19 @@ main.py
 
 - `plhm/pytorch/data.py`
 
-必要时在 `app.py` 里替换传入的 `dataset_factory`
+如果只是接线方式变化，再去 `app.py` 里替换 `dataset_factory`。
 
-### 想改训练 step、日志节奏、优化器行为
+### 想改训练 step 或优化器行为
 
 优先改：
 
 - `plhm/lightning/module.py`
 
-如果是任务规则变化，更应该继续拆出 task 层，而不是把 module.py 写得越来越胖。
+如果你发现这里开始越来越胖，说明任务逻辑应该继续外提，而不是继续往里堆。
 
-### 想改默认配置和命令行覆盖方式
+### 想改默认配置或命令行覆盖
 
-改：
+优先改：
 
 - `conf/config.yaml`
 - `plhm/hydra_loader.py`
@@ -712,97 +614,83 @@ main.py
 
 ### 想改实验记录方式
 
-改：
+优先改：
 
 - `plhm/mlflow.py`
 - `plhm/integrations/lightning_mlflow.py`
 
 而不是直接去 `main.py` 或 `lightning/module.py` 里插 Logger 代码。
 
-## 13. 这类项目最常见的错误拆法
+## 13. 这类项目最常见的坏味道
 
-下面这些都很常见，而且会迅速把 MVP 写回大泥球。
+下面这些问题在训练项目里非常常见，而且一旦开始，代码会很快退化。
 
-### 错误 1：在 `main.py` 里直接定义模型和训练逻辑
+### 错误 1：把一切都塞进 `main.py`
 
-后果：
+后果不是“文件变长”，而是入口、业务、日志、环境判断全部搅在一起。
 
-- 入口文件越来越胖
-- 什么都能改，什么都不好改
+### 错误 2：让 Hydra 对象到处流动
 
-### 错误 2：让 Hydra 配置对象流入所有模块
-
-后果：
-
-- 每个模块都被 Hydra 绑定
-- 以后想换配置系统时几乎要全项目改
+后果是整个项目都开始依赖 Hydra，之后想换配置方案会很痛苦。
 
 ### 错误 3：让 LightningModule 自己创建模型和数据
 
-后果：
+后果是训练框架开始拥有训练核心，边界很快失控。
 
-- 训练框架和业务实体绑死
-- 复用困难
+### 错误 4：到处散落 MLflow 调用
 
-### 错误 4：在训练代码里到处穿插 MLflow 调用
+后果是实验记录逻辑污染训练逻辑，最后谁都不纯。
 
-后果：
+### 错误 5：把“简单”误解成“全部写在一个文件里”
 
-- 框架耦合扩散
-- 训练逻辑被日志逻辑污染
+真正的简单不是文件少，而是职责清楚、修改路径短、阅读路径稳定。
 
-### 错误 5：把“简单”误解为“所有东西放一个文件”
+## 14. 怎么判断当前隔离做得够不够好
 
-真正的简单，不是文件少，而是职责清楚。
+可以直接用下面这份清单做自检：
 
-## 14. 你可以用什么标准判断“隔离是否足够好”
+- 改模型时，是否不需要改 Hydra 和 MLflow 代码
+- 改 Logger 时，是否不需要改 PyTorch 核心代码
+- 改配置来源时，是否不需要改 Lightning step
+- 一个框架对象是否只出现在边界层，而不是到处传
+- 是否存在一个明确的 Composition Root
+- `pytorch/` 里是否没有无关的 Hydra 或 MLflow 依赖
+- `lightning/` 里是否主要是在做适配，而不是吞掉全部业务逻辑
 
-给自己做代码评审时，可以直接用下面这份清单。
+如果这些问题大多都能回答“是”，那说明当前的隔离已经进入健康区间。
 
-### 检查清单
+## 15. 对这个项目的总体评价
 
-- 改模型结构时，是否不需要改 Hydra 和 MLflow 代码
-- 改 Logger 实现时，是否不需要改 PyTorch 核心代码
-- 改配置来源时，是否不需要改 Lightning 训练步骤
-- 一个框架对象是否只在边界层出现，而不是到处传递
-- 是否存在一个明确的 Composition Root，而不是多个地方都在偷偷组装
-- 某个模块名字里如果写着 `pytorch`，它是否真的不该 `import hydra` 或 `mlflow`
-- 某个模块名字里如果写着 `lightning`，它是否只是适配训练流程，而不是吞掉全部业务逻辑
+PLHM 现在最有价值的地方在于：
 
-如果这几条大多能满足，说明你的隔离已经进入比较健康的状态。
+- 它足够小，可以完整读完
+- 它又不是简单到只有一个脚本
+- 它把 `P/L/H/M` 架构拆分真正落到了代码里
+- 它已经具备 Composition Root、边界翻译、适配层、桥接层这些关键结构
 
-## 15. 对这个项目的最终评价
+如果目标是做一个“新手能读懂、后续还能继续长”的 MVP，这个方向是对的。
 
-这个项目现在已经具备一个很好的教学价值：
+如果目标升级为“尽可能最大化组件隔离”，那下一阶段最值得继续做的是：
 
-- 它足够小，新手能完整读完
-- 它又不至于小到只剩一个脚本
-- 它明确展示了如何把 `P/L/H/M` 拆成不同层次
-- 它已经有了 “Composition Root”“适配层”“中立配置对象” 这些关键结构
-
-如果你现在的目标是“做一个新手易懂、但不是脚本堆砌的 MVP”，那这个方向是对的。
-
-如果你的目标升级为“尽可能最大程度地隔离组件”，那下一阶段最应该继续做的是：
-
-1. 把任务逻辑从 LightningModule 中拆开
-2. 把 runtime 的环境探测和策略决策拆开
+1. 把任务逻辑从 LightningModule 里拆开
+2. 把环境探测和运行时策略拆开
 3. 把 Experiment Logger 再抽象一层
-4. 把配置拆成 Hydra Config Groups
+4. 把 Hydra 配置拆成 Config Groups
 
 ## 16. 推荐阅读顺序
 
-如果你准备自己继续演进这个项目，建议按这个顺序读代码：
+最后再给一个完整阅读顺序：
 
-1. [plhm/pytorch/model.py](/root/PLHM/plhm/pytorch/model.py:1)
-2. [plhm/pytorch/data.py](/root/PLHM/plhm/pytorch/data.py:1)
-3. [plhm/settings.py](/root/PLHM/plhm/settings.py:1)
-4. [plhm/lightning/module.py](/root/PLHM/plhm/lightning/module.py:1)
-5. [plhm/lightning/datamodule.py](/root/PLHM/plhm/lightning/datamodule.py:1)
-6. [plhm/runtime.py](/root/PLHM/plhm/runtime.py:1)
-7. [plhm/mlflow.py](/root/PLHM/plhm/mlflow.py:1)
-8. [plhm/integrations/lightning_mlflow.py](/root/PLHM/plhm/integrations/lightning_mlflow.py:1)
-9. [plhm/app.py](/root/PLHM/plhm/app.py:1)
-10. [plhm/hydra_loader.py](/root/PLHM/plhm/hydra_loader.py:1)
-11. [main.py](/root/PLHM/main.py:1)
+1. [`plhm/pytorch/model.py`](../plhm/pytorch/model.py)
+2. [`plhm/pytorch/data.py`](../plhm/pytorch/data.py)
+3. [`plhm/settings.py`](../plhm/settings.py)
+4. [`plhm/lightning/module.py`](../plhm/lightning/module.py)
+5. [`plhm/lightning/datamodule.py`](../plhm/lightning/datamodule.py)
+6. [`plhm/runtime.py`](../plhm/runtime.py)
+7. [`plhm/mlflow.py`](../plhm/mlflow.py)
+8. [`plhm/integrations/lightning_mlflow.py`](../plhm/integrations/lightning_mlflow.py)
+9. [`plhm/app.py`](../plhm/app.py)
+10. [`plhm/hydra_loader.py`](../plhm/hydra_loader.py)
+11. [`main.py`](../main.py)
 
-这样读，你会先理解核心，再理解适配器，最后理解总装层。
+按这个顺序读，你会先看见训练核心，再看见适配器，最后看见入口和总装逻辑。

@@ -94,7 +94,7 @@ main.py
 - 把 Hydra 配置转成普通 Python 对象
 - 把 PyTorch 模型包装成 LightningModule
 - 把 PyTorch 数据集包装成 LightningDataModule
-- 把 MLflow 记录器的构造单独收口
+- 把 MLflow Logger 的构造单独收口
 
 ### 4.3 组装层
 
@@ -106,7 +106,7 @@ main.py
 
 1. 拿到中立配置 `AppSettings`
 2. 推导运行时参数
-3. 构造 MLflow 记录器
+3. 构造 MLflow Logger
 4. 构造 DataModule
 5. 构造网络和 LightningModule
 6. 构造 `L.Trainer`
@@ -134,7 +134,7 @@ main.py
 这说明 `main.py` 没有直接碰：
 
 - Lightning 训练细节
-- MLflow 记录器构造
+- MLflow Logger 构造
 - PyTorch 模型定义
 - dataloader 参数推导
 
@@ -183,9 +183,9 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 这就是第三层隔离：内部代码依赖项目协议，不依赖外部配置协议。
 
-### 5.4 `app.py` 是组合根，不是业务细节仓库
+### 5.4 `app.py` 是 Composition Root，不是业务细节仓库
 
-[plhm/app.py](/root/PLHM/plhm/app.py:1) 现在承担的是“组合根”。
+[plhm/app.py](/root/PLHM/plhm/app.py:1) 现在承担的是 Composition Root。
 
 它知道所有部件怎么连，但它不应该承载每个部件的具体细节。
 
@@ -226,7 +226,7 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 - Hydra 配置读取
 - Lightning 日志记录
-- MLflow 记录器创建
+- MLflow Logger 创建
 - GPU/precision 策略选择
 - 训练生命周期回调
 
@@ -265,7 +265,7 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 - 直接定义业务模型结构
 - 解析 Hydra 配置
-- 决定 MLflow 的 tracking URI
+- 决定 MLflow 的 Tracking URI
 - 推导全局 batch size
 
 #### 当前优点
@@ -351,8 +351,8 @@ conf/
 
 这层应该只负责：
 
-- tracking URI 构造
-- 记录器构造
+- Tracking URI 构造
+- Logger 构造
 - 超参数扁平化
 
 这层不应该负责：
@@ -364,7 +364,7 @@ conf/
 #### 当前优点
 
 - `build_tracking_uri(...)` 被单独抽出
-- `build_mlflow_logger(...)` 被放进集成层，而不是散落在入口或 LightningModule 里
+- `build_mlflow_logger(...)` 被放进 Integration 层，而不是散落在入口或 LightningModule 里
 
 这非常重要，因为 `Lightning` 和 `MLflow` 的耦合是“跨框架耦合”，最容易越写越乱。
 
@@ -374,13 +374,13 @@ conf/
 
 - TensorBoard
 - Weights & Biases
-- CSV 记录器
+- CSV Logger
 
 那么更好的做法是再增加一层：
 
 - `experiment_logger_factory`
 
-让 `app.py` 不直接知道具体记录器类型，而只请求“一个实验记录器”。
+让 `app.py` 不直接知道具体 Logger 类型，而只请求“一个实验记录器”。
 
 ## 7. 当前设计为什么已经比很多 MVP 干净
 
@@ -391,7 +391,7 @@ conf/
 - 定义 dataset
 - 构造 dataloader
 - 构造 trainer
-- 构造记录器
+- 构造 Logger
 - 打印环境信息
 - 训练
 - 汇总指标
@@ -408,7 +408,7 @@ conf/
 - 入口和组装分离
 - 框架配置和项目设置分离
 - 核心 PyTorch 代码和 Lightning 生命周期分离
-- MLflow 和训练主流程的耦合集中到集成层
+- MLflow 和训练主流程的耦合集中到 Integration 层
 
 这意味着它已经不是“单文件脚本”，而是一个真正有演进空间的最小架构。
 
@@ -420,7 +420,7 @@ conf/
 
 这不是坏事。
 
-组合根本来就应该承担集中耦合。真正要避免的是：
+Composition Root 本来就应该承担集中耦合。真正要避免的是：
 
 - 到处都有一点点耦合
 
@@ -507,7 +507,7 @@ conf/
 例如：
 
 - `DictConfig` 尽快变成 `AppSettings`
-- MLflow 记录器尽快变成一个组装好的实例
+- MLflow Logger 尽快变成一个组装好的实例
 
 不要让框架原生对象在全项目到处漂流。
 
@@ -640,7 +640,7 @@ main.py
 
 这样测试会更容易写，也更方便以后支持别的硬件环境。
 
-### 第 4 步：把实验记录器做成统一接口
+### 第 4 步：把 Experiment Logger 做成统一接口
 
 例如抽象成：
 
@@ -650,7 +650,7 @@ main.py
 
 这样 `app.py` 不再直接感知具体实验平台。
 
-### 第 5 步：把 Hydra 配置拆成配置组
+### 第 5 步：把 Hydra 配置拆成 Config Groups
 
 当配置继续变多时，`conf/config.yaml` 会很快变臃肿。
 
@@ -717,7 +717,7 @@ main.py
 - `plhm/mlflow.py`
 - `plhm/integrations/lightning_mlflow.py`
 
-而不是直接去 `main.py` 或 `lightning/module.py` 里插记录器代码。
+而不是直接去 `main.py` 或 `lightning/module.py` 里插 Logger 代码。
 
 ## 13. 这类项目最常见的错误拆法
 
@@ -762,10 +762,10 @@ main.py
 ### 检查清单
 
 - 改模型结构时，是否不需要改 Hydra 和 MLflow 代码
-- 改记录器实现时，是否不需要改 PyTorch 核心代码
+- 改 Logger 实现时，是否不需要改 PyTorch 核心代码
 - 改配置来源时，是否不需要改 Lightning 训练步骤
 - 一个框架对象是否只在边界层出现，而不是到处传递
-- 是否存在一个明确的组合根，而不是多个地方都在偷偷组装
+- 是否存在一个明确的 Composition Root，而不是多个地方都在偷偷组装
 - 某个模块名字里如果写着 `pytorch`，它是否真的不该 `import hydra` 或 `mlflow`
 - 某个模块名字里如果写着 `lightning`，它是否只是适配训练流程，而不是吞掉全部业务逻辑
 
@@ -778,7 +778,7 @@ main.py
 - 它足够小，新手能完整读完
 - 它又不至于小到只剩一个脚本
 - 它明确展示了如何把 `P/L/H/M` 拆成不同层次
-- 它已经有了“组合根”“适配层”“中立配置对象”这些关键结构
+- 它已经有了 “Composition Root”“适配层”“中立配置对象” 这些关键结构
 
 如果你现在的目标是“做一个新手易懂、但不是脚本堆砌的 MVP”，那这个方向是对的。
 
@@ -786,8 +786,8 @@ main.py
 
 1. 把任务逻辑从 LightningModule 中拆开
 2. 把 runtime 的环境探测和策略决策拆开
-3. 把实验记录器再抽象一层
-4. 把配置拆成 Hydra 配置组
+3. 把 Experiment Logger 再抽象一层
+4. 把配置拆成 Hydra Config Groups
 
 ## 16. 推荐阅读顺序
 

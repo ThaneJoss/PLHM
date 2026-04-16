@@ -17,7 +17,7 @@
 - `main.py`：Hydra 入口。读取配置后交给应用层。
 - `plhm/hydra_loader.py`：把 Hydra 配置转换成框架无关的设置对象。
 - `plhm/settings.py`：整个代码库共享的配置 schema。
-- `plhm/app.py`：组合根。唯一负责把各个框架拼起来的地方。
+- `plhm/app.py`：Composition Root。唯一负责把各个框架拼起来的地方。
 - `plhm/pytorch/`：纯 PyTorch 代码，负责数据生成和模型定义。
 - `plhm/lightning/`：围绕 PyTorch 代码的一层薄 Lightning 适配器。
 - `plhm/mlflow.py`：只负责 MLflow 初始化。

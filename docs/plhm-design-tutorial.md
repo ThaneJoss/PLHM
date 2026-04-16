@@ -1,4 +1,4 @@
-# PLHM Design Tutorial
+# PLHM 设计教程
 
 ## 1. 先用一句话说清这个项目
 
@@ -94,7 +94,7 @@ main.py
 - 把 Hydra 配置转成普通 Python 对象
 - 把 PyTorch 模型包装成 LightningModule
 - 把 PyTorch 数据集包装成 LightningDataModule
-- 把 MLflow logger 的构造单独收口
+- 把 MLflow 记录器的构造单独收口
 
 ### 4.3 组装层
 
@@ -106,7 +106,7 @@ main.py
 
 1. 拿到中立配置 `AppSettings`
 2. 推导运行时参数
-3. 构造 MLflow logger
+3. 构造 MLflow 记录器
 4. 构造 DataModule
 5. 构造网络和 LightningModule
 6. 构造 `L.Trainer`
@@ -134,7 +134,7 @@ main.py
 这说明 `main.py` 没有直接碰：
 
 - Lightning 训练细节
-- MLflow logger 构造
+- MLflow 记录器构造
 - PyTorch 模型定义
 - dataloader 参数推导
 
@@ -185,7 +185,7 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 ### 5.4 `app.py` 是组合根，不是业务细节仓库
 
-[plhm/app.py](/root/PLHM/plhm/app.py:1) 现在承担的是 composition root，也可以叫“组合根”。
+[plhm/app.py](/root/PLHM/plhm/app.py:1) 现在承担的是“组合根”。
 
 它知道所有部件怎么连，但它不应该承载每个部件的具体细节。
 
@@ -226,7 +226,7 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 - Hydra 配置读取
 - Lightning 日志记录
-- MLflow logger 创建
+- MLflow 记录器创建
 - GPU/precision 策略选择
 - 训练生命周期回调
 
@@ -243,9 +243,9 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 这不算错误，但如果你追求更强隔离，可以继续拆成：
 
-- `dataset factory`
-- `split policy`
-- `model factory`
+- `dataset_factory`
+- `split_policy`
+- `model_factory`
 
 ### 6.2 L: Lightning 层
 
@@ -265,7 +265,7 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 - 直接定义业务模型结构
 - 解析 Hydra 配置
-- 决定 MLflow tracking URI
+- 决定 MLflow 的 tracking URI
 - 推导全局 batch size
 
 #### 当前优点
@@ -292,10 +292,10 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 所以更强的隔离方式是把下面这些继续外提：
 
-- `loss function`
-- `metrics computer`
-- `log naming policy`
-- `optimizer factory`
+- `loss_fn`
+- `metrics_computer`
+- `log_naming_policy`
+- `optimizer_factory`
 
 也就是让 LightningModule 更像一个“流程容器”，而不是“训练逻辑全集”。
 
@@ -311,7 +311,7 @@ Hydra 的 `DictConfig` 很方便，但它本身属于框架对象。如果这个
 
 - 接收配置输入
 - 做默认值管理
-- 处理命令行 override
+- 处理命令行覆盖参数
 - 在入口把配置翻译成项目内部对象
 
 这层不应该负责：
@@ -352,7 +352,7 @@ conf/
 这层应该只负责：
 
 - tracking URI 构造
-- logger 构造
+- 记录器构造
 - 超参数扁平化
 
 这层不应该负责：
@@ -364,7 +364,7 @@ conf/
 #### 当前优点
 
 - `build_tracking_uri(...)` 被单独抽出
-- `build_mlflow_logger(...)` 被放进 integration 层，而不是散落在入口或 LightningModule 里
+- `build_mlflow_logger(...)` 被放进集成层，而不是散落在入口或 LightningModule 里
 
 这非常重要，因为 `Lightning` 和 `MLflow` 的耦合是“跨框架耦合”，最容易越写越乱。
 
@@ -374,13 +374,13 @@ conf/
 
 - TensorBoard
 - Weights & Biases
-- CSV logger
+- CSV 记录器
 
 那么更好的做法是再增加一层：
 
-- `experiment logger factory`
+- `experiment_logger_factory`
 
-让 `app.py` 不直接知道具体 logger 类型，而只请求“一个实验记录器”。
+让 `app.py` 不直接知道具体记录器类型，而只请求“一个实验记录器”。
 
 ## 7. 当前设计为什么已经比很多 MVP 干净
 
@@ -391,7 +391,7 @@ conf/
 - 定义 dataset
 - 构造 dataloader
 - 构造 trainer
-- 构造 logger
+- 构造记录器
 - 打印环境信息
 - 训练
 - 汇总指标
@@ -408,7 +408,7 @@ conf/
 - 入口和组装分离
 - 框架配置和项目设置分离
 - 核心 PyTorch 代码和 Lightning 生命周期分离
-- MLflow 和训练主流程的耦合集中到 integration 层
+- MLflow 和训练主流程的耦合集中到集成层
 
 这意味着它已经不是“单文件脚本”，而是一个真正有演进空间的最小架构。
 
@@ -442,8 +442,8 @@ conf/
 
 如果你追求更高隔离，可以把这部分再拆成：
 
-- `hardware probe`
-- `runtime policy`
+- `hardware_probe`
+- `runtime_policy`
 
 前者负责采集环境事实，后者负责根据事实做决策。
 
@@ -458,8 +458,8 @@ conf/
 
 更强的隔离方式是：
 
-- `environment snapshot` 单独生成纯数据对象
-- `report renderer` 只负责打印
+- `environment_snapshot` 单独生成纯数据对象
+- `report_renderer` 只负责打印
 
 ### 8.4 `ClassificationModule` 里把任务类型写死成分类任务
 
@@ -485,7 +485,7 @@ conf/
 
 可以用下面这套规则来判断结构是否足够隔离。
 
-### 规则 1：核心层不能 import 外部编排框架
+### 规则 1：核心层不能 `import` 外部编排框架
 
 核心层通常指：
 
@@ -507,7 +507,7 @@ conf/
 例如：
 
 - `DictConfig` 尽快变成 `AppSettings`
-- MLflow logger 尽快变成一个组装好的实例
+- MLflow 记录器尽快变成一个组装好的实例
 
 不要让框架原生对象在全项目到处漂流。
 
@@ -586,11 +586,11 @@ main.py
 
 这套结构的意思是：
 
-- `domain/`: 只放领域对象和纯规则
-- `application/`: 只放用例和流程编排
-- `adapters/`: 专门接框架
-- `integrations/`: 专门放跨框架粘合逻辑
-- `bootstrap/`: 专门做最终组装
+- `domain/`：只放领域对象和纯规则
+- `application/`：只放用例和流程编排
+- `adapters/`：专门对接框架
+- `integrations/`：专门放跨框架粘合逻辑
+- `bootstrap/`：专门做最终组装
 
 这会比当前结构更复杂，但在项目持续长大时更稳定。
 
@@ -615,7 +615,7 @@ main.py
 
 - 换任务类型时，不需要大改 LightningModule
 
-### 第 2 步：把 optimizer 构造变成 factory
+### 第 2 步：把优化器构造变成工厂
 
 现在 `configure_optimizers()` 里写死了 `Adam`。
 
@@ -626,7 +626,7 @@ main.py
 
 这样模型层、任务层、训练框架层之间的职责会更清楚。
 
-### 第 3 步：把 runtime probe 和 runtime policy 分开
+### 第 3 步：把运行时探测和运行时策略分开
 
 现在 `runtime.py` 同时做了：
 
@@ -640,7 +640,7 @@ main.py
 
 这样测试会更容易写，也更方便以后支持别的硬件环境。
 
-### 第 4 步：把 experiment logger 做成统一接口
+### 第 4 步：把实验记录器做成统一接口
 
 例如抽象成：
 
@@ -650,7 +650,7 @@ main.py
 
 这样 `app.py` 不再直接感知具体实验平台。
 
-### 第 5 步：把 Hydra 配置拆成 config groups
+### 第 5 步：把 Hydra 配置拆成配置组
 
 当配置继续变多时，`conf/config.yaml` 会很快变臃肿。
 
@@ -692,7 +692,7 @@ main.py
 
 - `plhm/pytorch/data.py`
 
-必要时在 `app.py` 替换传入 `dataset_factory`
+必要时在 `app.py` 里替换传入的 `dataset_factory`
 
 ### 想改训练 step、日志节奏、优化器行为
 
@@ -717,7 +717,7 @@ main.py
 - `plhm/mlflow.py`
 - `plhm/integrations/lightning_mlflow.py`
 
-而不是直接去 `main.py` 或 `lightning/module.py` 里插 logger 代码。
+而不是直接去 `main.py` 或 `lightning/module.py` 里插记录器代码。
 
 ## 13. 这类项目最常见的错误拆法
 
@@ -757,16 +757,16 @@ main.py
 
 ## 14. 你可以用什么标准判断“隔离是否足够好”
 
-给自己做 code review 时，可以直接用下面这份清单。
+给自己做代码评审时，可以直接用下面这份清单。
 
 ### 检查清单
 
 - 改模型结构时，是否不需要改 Hydra 和 MLflow 代码
-- 改 logger 实现时，是否不需要改 PyTorch 核心代码
+- 改记录器实现时，是否不需要改 PyTorch 核心代码
 - 改配置来源时，是否不需要改 Lightning 训练步骤
 - 一个框架对象是否只在边界层出现，而不是到处传递
 - 是否存在一个明确的组合根，而不是多个地方都在偷偷组装
-- 某个模块名字里如果写着 `pytorch`，它是否真的不该 import `hydra` 或 `mlflow`
+- 某个模块名字里如果写着 `pytorch`，它是否真的不该 `import hydra` 或 `mlflow`
 - 某个模块名字里如果写着 `lightning`，它是否只是适配训练流程，而不是吞掉全部业务逻辑
 
 如果这几条大多能满足，说明你的隔离已经进入比较健康的状态。
@@ -786,8 +786,8 @@ main.py
 
 1. 把任务逻辑从 LightningModule 中拆开
 2. 把 runtime 的环境探测和策略决策拆开
-3. 把 experiment logger 再抽象一层
-4. 把配置拆成 Hydra config groups
+3. 把实验记录器再抽象一层
+4. 把配置拆成 Hydra 配置组
 
 ## 16. 推荐阅读顺序
 

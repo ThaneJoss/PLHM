@@ -1,30 +1,30 @@
 # PLHM
 
-GPU-capable training scaffold built with PyTorch, Lightning, Hydra, and MLflow.
+一个基于 PyTorch、Lightning、Hydra 和 MLflow 的 GPU 训练脚手架。
 
-## What it does
+## 项目做什么
 
-- Trains a compact MLP on a synthetic 2D binary classification dataset.
-- Uses Hydra only as the configuration entrypoint.
-- Uses Lightning only as the training-loop adapter.
-- Uses MLflow only as the experiment tracker.
-- Uses GPU automatically when CUDA is available.
+- 在一个合成的二维二分类数据集上训练一个小型 MLP。
+- 只把 Hydra 用作配置入口。
+- 只把 Lightning 用作训练循环适配层。
+- 只把 MLflow 用作实验记录层。
+- 当 CUDA 可用时自动使用 GPU。
 
-## Module boundaries
+## 模块边界
 
-The repository is split by responsibility so beginners can follow one layer at a time:
+仓库按职责拆分，方便新手一层一层读：
 
-- `main.py`: Hydra entrypoint. Reads config and hands off to the app layer.
-- `plhm/hydra_loader.py`: Converts Hydra config into framework-neutral settings objects.
-- `plhm/settings.py`: Shared config schema used by the rest of the codebase.
-- `plhm/app.py`: Composition root. The only place that wires frameworks together.
-- `plhm/pytorch/`: Pure PyTorch code for data generation and model definition.
-- `plhm/lightning/`: Thin Lightning adapters around the PyTorch code.
-- `plhm/mlflow.py`: MLflow-only setup.
-- `plhm/integrations/lightning_mlflow.py`: Explicit bridge between Lightning and MLflow.
-- `plhm/runtime.py`: Runtime resolution for devices, precision, and dataloader settings.
+- `main.py`：Hydra 入口。读取配置后交给应用层。
+- `plhm/hydra_loader.py`：把 Hydra 配置转换成框架无关的设置对象。
+- `plhm/settings.py`：整个代码库共享的配置 schema。
+- `plhm/app.py`：组合根。唯一负责把各个框架拼起来的地方。
+- `plhm/pytorch/`：纯 PyTorch 代码，负责数据生成和模型定义。
+- `plhm/lightning/`：围绕 PyTorch 代码的一层薄 Lightning 适配器。
+- `plhm/mlflow.py`：只负责 MLflow 初始化。
+- `plhm/integrations/lightning_mlflow.py`：显式收口 Lightning 和 MLflow 的桥接逻辑。
+- `plhm/runtime.py`：解析设备、精度和 dataloader 等运行时设置。
 
-Dependency flow:
+依赖方向：
 
 ```text
 Hydra -> hydra_loader -> settings -> app
@@ -33,7 +33,7 @@ app -> MLflow
 app -> runtime helpers
 ```
 
-## Read order for beginners
+## 新手阅读顺序
 
 1. `plhm/pytorch/model.py`
 2. `plhm/pytorch/data.py`
@@ -44,18 +44,18 @@ app -> runtime helpers
 7. `plhm/hydra_loader.py`
 8. `main.py`
 
-## Architecture tutorial
+## 架构教程
 
-- Chinese detailed design and isolation guide: [docs/plhm-design-tutorial.md](/root/PLHM/docs/plhm-design-tutorial.md:1)
+- 详细的设计与解耦分析： [docs/plhm-design-tutorial.md](/root/PLHM/docs/plhm-design-tutorial.md:1)
 
-## Run
+## 运行方式
 
 ```bash
 uv sync
 uv run python main.py
 ```
 
-## Useful overrides
+## 常用覆盖参数
 
 ```bash
 uv run python main.py trainer.max_epochs=10
@@ -63,7 +63,7 @@ uv run python main.py trainer.accelerator=gpu trainer.devices=1
 uv run python main.py data.batch_size=512 model.hidden_dim=128
 ```
 
-## Outputs
+## 输出内容
 
-- Hydra run outputs: `outputs/`
-- MLflow SQLite database: `mlflow.db`
+- Hydra 运行输出：`outputs/`
+- MLflow SQLite 数据库：`mlflow.db`

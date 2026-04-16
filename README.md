@@ -44,6 +44,10 @@ app -> runtime helpers
 7. `plhm/hydra_loader.py`
 8. `main.py`
 
+## Architecture tutorial
+
+- Chinese detailed design and isolation guide: [docs/plhm-design-tutorial.md](/root/PLHM/docs/plhm-design-tutorial.md:1)
+
 ## Run
 
 ```bash

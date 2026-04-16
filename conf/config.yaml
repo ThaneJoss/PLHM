@@ -1,0 +1,37 @@
+seed: 42
+
+data:
+  n_samples: 262144
+  batch_size: 2048
+  num_workers: -1
+  prefetch_factor: 4
+  persistent_workers: true
+
+model:
+  input_dim: 2
+  hidden_dim: 256
+  lr: 0.001
+
+trainer:
+  max_epochs: 5
+  accelerator: auto
+  devices: auto
+  strategy: auto
+  precision: auto
+  matmul_precision: high
+  benchmark: true
+  deterministic: false
+  num_sanity_val_steps: 0
+  log_every_n_steps: 5
+  enable_model_summary: false
+
+mlflow:
+  experiment_name: plhm
+  run_name: train
+  db_file: mlflow.db
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: false

@@ -38,6 +38,7 @@ def run_training(cfg: AppSettings, project_root: Path) -> dict[str, float]:
         num_workers=dataloader_config.num_workers,
         prefetch_factor=dataloader_config.prefetch_factor,
         persistent_workers=dataloader_config.persistent_workers,
+        pin_memory=dataloader_config.pin_memory,
     )
     network = TinyClassifier(
         input_dim=cfg.model.input_dim,

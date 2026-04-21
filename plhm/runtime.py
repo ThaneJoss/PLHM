@@ -24,6 +24,7 @@ class DataLoaderConfig:
     num_workers: int
     prefetch_factor: int | None
     persistent_workers: bool
+    pin_memory: bool
 
 
 def resolve_num_workers(requested_workers: int, device_count: int) -> int:
@@ -87,4 +88,5 @@ def resolve_dataloader_config(data_cfg: DataSettings, runtime: RuntimeConfig) ->
         num_workers=num_workers,
         prefetch_factor=data_cfg.prefetch_factor if num_workers > 0 else None,
         persistent_workers=bool(data_cfg.persistent_workers and num_workers > 0),
+        pin_memory=runtime.accelerator == "gpu" and torch.cuda.is_available(),
     )

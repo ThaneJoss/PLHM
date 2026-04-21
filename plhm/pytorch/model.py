@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from torch import nn
+from torch import Tensor, nn
 
 
 class TinyClassifier(nn.Module):
@@ -14,5 +14,5 @@ class TinyClassifier(nn.Module):
             nn.Linear(hidden_dim, 2),
         )
 
-    def forward(self, inputs):
+    def forward(self, inputs: Tensor) -> Tensor:
         return self.network(inputs)

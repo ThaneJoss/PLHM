@@ -11,6 +11,8 @@
 - Use Git author `codex <codex@thanejoss.com>`.
 - Make code changes in the local repository root for the active checkout.
 - Use local Git for `commit` and `push`.
+- After each completed change, open a pull request for the user to review.
+- Target `main` with each pull request and keep the working branch synced with `main`.
 - Keep `main` as the primary branch unless the user requests a different branching workflow.
 
 ## Privacy and Infrastructure

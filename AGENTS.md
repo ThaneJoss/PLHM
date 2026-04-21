@@ -19,6 +19,8 @@
 
 - Keep private infrastructure details, machine-specific paths, hostnames, SSH settings, and server notes out of the repository.
 - Store sensitive operational notes only in local Codex memory or other non-repository local files.
+- Do not run local `uv` package installation or execution commands such as `uv sync`, `uv add`, or `uv run` on this machine.
+- This machine is only a lightweight jump host; use the remote SSH development server for dependency installation, running code, testing, and debugging.
 
 ## GitHub
 

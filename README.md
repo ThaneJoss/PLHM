@@ -79,6 +79,8 @@ python -m plhm.depgraph serve --root . --host 127.0.0.1 --port 8765
 
 启动后访问 `http://127.0.0.1:8765`，页面会读取 `/api/depgraph/snapshot`，并通过 `/api/depgraph/events` 监听源码变化后的自动刷新。
 
+如果你想看更完整的 `depgraph` 使用说明，可以直接读 [`DEPGRAPH.md`](DEPGRAPH.md)。
+
 ---
 
 ## 3. 第一次运行时，项目内部发生了什么

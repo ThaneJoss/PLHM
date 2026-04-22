@@ -80,12 +80,8 @@ createApp({
         return;
       }
       await nextTick();
-      const container = this.$refs.canvas;
-      if (!container) {
-        return;
-      }
       if (!this.graphController) {
-        this.graphController = createGraphController(container, (selected) => {
+        this.graphController = createGraphController(this.$refs.canvas, (selected) => {
           this.selected = selected;
         });
       }
@@ -93,9 +89,6 @@ createApp({
     },
     formatReasons(reasons) {
       return (reasons ?? []).join(" ");
-    },
-    optimizeLayout() {
-      this.graphController?.optimizeLayout(this.filters);
     },
   },
   template: `
@@ -152,7 +145,6 @@ createApp({
           <span>只看违规边</span>
         </label>
         <button type="button" @click="loadSnapshot">手动刷新</button>
-        <button type="button" @click="optimizeLayout">自动优化布局</button>
       </section>
 
       <section class="workspace">
@@ -163,7 +155,7 @@ createApp({
           </header>
           <div v-if="loading" class="empty-state">正在读取 snapshot...</div>
           <div v-else-if="error" class="empty-state error">{{ error }}</div>
-          <div ref="canvas" class="canvas"></div>
+          <div v-else ref="canvas" class="canvas"></div>
         </article>
 
         <aside class="panel inspector-panel">

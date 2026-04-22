@@ -7,6 +7,23 @@ from plhm.depgraph.server import serve_depgraph
 from plhm.depgraph.snapshot_service import SnapshotService
 
 
+def build_serve_message(root: Path, host: str, port: int) -> str:
+    lines = [
+        f"Serving PLHM dependency graph from {root}",
+        f"Browser URL: http://{host}:{port}",
+        "This command starts an HTTP server. It does not render a UI in the terminal.",
+    ]
+    if host in {"127.0.0.1", "localhost", "::1"}:
+        lines.extend(
+            [
+                "If this server is running on a remote machine, forward the port before opening it locally:",
+                f"  ssh -L {port}:127.0.0.1:{port} <remote-host>",
+            ]
+        )
+    lines.append("Press Ctrl+C to stop.")
+    return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="PLHM dependency graph tooling.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -46,7 +63,7 @@ def main() -> None:
         return
 
     if args.command == "serve":
-        print(f"Serving PLHM dependency graph at http://{args.host}:{args.port}")
+        print(build_serve_message(root, args.host, args.port), flush=True)
         serve_depgraph(root, args.host, args.port)
         return
 

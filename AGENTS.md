@@ -2,6 +2,7 @@
 
 ## Project
 
+- The project name is `PLHM`, not `PHLM`.
 - Do not assume a fixed absolute path for the local checkout.
 
 ## Repository Hygiene

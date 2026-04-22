@@ -94,6 +94,9 @@ createApp({
     formatReasons(reasons) {
       return (reasons ?? []).join(" ");
     },
+    optimizeLayout() {
+      this.graphController?.optimizeLayout(this.filters);
+    },
   },
   template: `
     <main class="shell">
@@ -149,6 +152,7 @@ createApp({
           <span>只看违规边</span>
         </label>
         <button type="button" @click="loadSnapshot">手动刷新</button>
+        <button type="button" @click="optimizeLayout">自动优化布局</button>
       </section>
 
       <section class="workspace">

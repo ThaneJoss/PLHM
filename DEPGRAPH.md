@@ -37,7 +37,13 @@
 你可以直接用模块入口：
 
 ```bash
-uv run plhm-depgraph <subcommand>
+python -m plhm.depgraph <subcommand>
+```
+
+也可以用脚本入口：
+
+```bash
+plhm-depgraph <subcommand>
 ```
 
 当前支持两个子命令：
@@ -50,7 +56,13 @@ uv run plhm-depgraph <subcommand>
 如果你只想拿到依赖图数据，不需要开浏览器页面，可以直接导出 JSON：
 
 ```bash
-uv run plhm-depgraph export --root . --output graph.json
+python -m plhm.depgraph export --root . --output graph.json
+```
+
+或者：
+
+```bash
+plhm-depgraph export --root . --output graph.json
 ```
 
 参数说明：
@@ -72,7 +84,13 @@ Wrote dependency graph snapshot to /abs/path/to/graph.json
 如果你想直接看图，可以启动本地只读服务：
 
 ```bash
-uv run plhm-depgraph serve --root . --host 127.0.0.1 --port 8765
+python -m plhm.depgraph serve --root . --host 127.0.0.1 --port 8765
+```
+
+或者：
+
+```bash
+plhm-depgraph serve --root . --host 127.0.0.1 --port 8765
 ```
 
 然后在浏览器里访问：
@@ -80,8 +98,6 @@ uv run plhm-depgraph serve --root . --host 127.0.0.1 --port 8765
 ```text
 http://127.0.0.1:8765
 ```
-
-这里推荐显式通过 `uv run` 启动，而不是直接调用系统 `python` 或默认 PATH 里的脚本。原因很直接：`PLHM` 对 Python 版本和项目环境有要求，跑到错误解释器时很容易因为版本不一致或缺依赖而启动失败。
 
 这个服务会同时提供：
 
@@ -206,13 +222,13 @@ http://127.0.0.1:8765
 ### 只想拿一个可提交的图快照
 
 ```bash
-uv run plhm-depgraph export --root . --output graph.json
+python -m plhm.depgraph export --root . --output graph.json
 ```
 
 ### 一边改代码一边看结构变化
 
 ```bash
-uv run plhm-depgraph serve --root . --host 127.0.0.1 --port 8765
+python -m plhm.depgraph serve --root . --host 127.0.0.1 --port 8765
 ```
 
 ### 看某个模块有没有不该出现的反向依赖

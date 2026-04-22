@@ -31,7 +31,6 @@
 - 训练通过 Lightning 的 `Trainer.fit(...)` 运行
 - 配置由 Hydra 提供
 - 实验信息由 MLflow 记录
-- 现在还额外带了一个依赖图工具，用来观察 `main.py` 和 `plhm/**/*.py` 的导入关系
 
 你可以把它看成一个“最小但完整”的训练项目骨架。以后你换成自己的模型、自己的数据、自己的实验记录方式，整体思路也是类似的。
 
@@ -64,20 +63,6 @@ uv run python main.py data.batch_size=512 model.hidden_dim=128
 如果你是第一次接触这类项目，可以先记住一件事：
 
 > `conf/config.yaml` 决定默认行为，命令行覆盖参数决定这一次运行想怎么改。
-
-如果你要看当前代码结构，而不是直接跑训练，现在也可以导出依赖图快照：
-
-```bash
-python -m plhm.depgraph export --root . --output graph.json
-```
-
-或者启动本地依赖图面板：
-
-```bash
-python -m plhm.depgraph serve --root . --host 127.0.0.1 --port 8765
-```
-
-启动后访问 `http://127.0.0.1:8765`，页面会读取 `/api/depgraph/snapshot`，并通过 `/api/depgraph/events` 监听源码变化后的自动刷新。
 
 ---
 

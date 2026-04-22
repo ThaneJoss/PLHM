@@ -327,8 +327,6 @@ uv run python -m plhm.depgraph serve --root . --host 127.0.0.1 --port 8765
 
 - 是否已经执行 `serve`
 - 访问地址是否和 `--host`、`--port` 一致
-- 这个命令只会启动 HTTP 服务，不会在终端里直接显示图形界面
-- 如果服务跑在远程机器且监听的是 `127.0.0.1`，是否已经做了 SSH 端口转发
 - `/api/depgraph/snapshot` 是否能返回 JSON
 
 ### 11.6 depgraph 没看到想要的关系

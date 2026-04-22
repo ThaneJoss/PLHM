@@ -80,8 +80,12 @@ createApp({
         return;
       }
       await nextTick();
+      const container = this.$refs.canvas;
+      if (!container) {
+        return;
+      }
       if (!this.graphController) {
-        this.graphController = createGraphController(this.$refs.canvas, (selected) => {
+        this.graphController = createGraphController(container, (selected) => {
           this.selected = selected;
         });
       }
@@ -155,7 +159,7 @@ createApp({
           </header>
           <div v-if="loading" class="empty-state">正在读取 snapshot...</div>
           <div v-else-if="error" class="empty-state error">{{ error }}</div>
-          <div v-else ref="canvas" class="canvas"></div>
+          <div ref="canvas" class="canvas"></div>
         </article>
 
         <aside class="panel inspector-panel">

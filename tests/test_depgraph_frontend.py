@@ -27,6 +27,23 @@ class DepgraphFrontendImportMapTestCase(unittest.TestCase):
         self.assertIn("optimizeLayout(filters) {", graph_js)
         self.assertIn("cy.layout(buildLayoutOptions(filters, true)).run();", graph_js)
 
+    def test_depgraph_app_defaults_to_plhm_view(self) -> None:
+        app_js = Path("frontend/depgraph/app.js").read_text(encoding="utf-8")
+
+        self.assertIn('viewMode: "plhm"', app_js)
+        self.assertIn('<option value="plhm">PLHM</option>', app_js)
+
+    def test_depgraph_graph_builds_plhm_four_way_design_view(self) -> None:
+        graph_js = Path("frontend/depgraph/graph.js").read_text(encoding="utf-8")
+
+        self.assertIn('const PLHM_ROOT = {', graph_js)
+        self.assertIn('id: "design:P"', graph_js)
+        self.assertIn('id: "design:L"', graph_js)
+        self.assertIn('id: "design:H"', graph_js)
+        self.assertIn('id: "design:M"', graph_js)
+        self.assertIn('return buildPlhmDesignElements(snapshot, filters);', graph_js)
+        self.assertIn('name: "preset"', graph_js)
+
 
 if __name__ == "__main__":
     unittest.main()

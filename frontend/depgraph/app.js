@@ -14,7 +14,7 @@ createApp({
       filters: {
         layer: "all",
         search: "",
-        viewMode: "package",
+        viewMode: "plhm",
         violationsOnly: false,
       },
     };
@@ -132,6 +132,7 @@ createApp({
         <label>
           <span>视图</span>
           <select v-model="filters.viewMode">
+            <option value="plhm">PLHM</option>
             <option value="package">Package</option>
             <option value="file">File</option>
           </select>

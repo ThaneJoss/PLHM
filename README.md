@@ -165,7 +165,7 @@ uv run python main.py data.batch_size=512 model.hidden_dim=128
 如果你只想导出当前结构快照：
 
 ```bash
-uv run python -m plhm.depgraph export --root . --output graph.json
+uv run plhm-depgraph export --root . --output graph.json
 ```
 
 ### 7.3 depgraph 面板
@@ -173,7 +173,7 @@ uv run python -m plhm.depgraph export --root . --output graph.json
 如果你想直接看结构图：
 
 ```bash
-uv run python -m plhm.depgraph serve --root . --host 127.0.0.1 --port 8765
+uv run plhm-depgraph serve --root . --host 127.0.0.1 --port 8765
 ```
 
 然后访问：
@@ -182,7 +182,7 @@ uv run python -m plhm.depgraph serve --root . --host 127.0.0.1 --port 8765
 http://127.0.0.1:8765
 ```
 
-这里推荐显式通过 `uv run python -m ...` 启动，而不是直接用系统 `python` 或裸跑 PATH 里的脚本。原因很直接：`PLHM` 对 Python 版本和项目环境有要求，跑到错误解释器时很容易因为版本不一致或缺依赖导致启动失败。
+这里推荐显式通过 `uv run` 启动，而不是直接用系统 `python` 或裸跑 `plhm-depgraph`，因为 `depgraph` 对 Python 版本和项目环境有依赖，跑到默认解释器时很容易出现版本不一致或缺依赖导致的启动失败。
 
 更完整的 `depgraph` 用法见 [DEPGRAPH.md](DEPGRAPH.md)。
 
@@ -211,7 +211,7 @@ uv run python main.py
 如果你执行的是：
 
 ```bash
-uv run python -m plhm.depgraph serve --root . --host 127.0.0.1 --port 8765
+uv run plhm-depgraph serve --root . --host 127.0.0.1 --port 8765
 ```
 
 则流程会变成：

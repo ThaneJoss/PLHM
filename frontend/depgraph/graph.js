@@ -104,17 +104,42 @@ export function createGraphController(container, onSelect) {
       const elements = buildElements(snapshot, filters);
       cy.elements().remove();
       cy.add(elements);
-      cy.layout({
-        name: filters.viewMode === "package" ? "breadthfirst" : "cose",
-        directed: true,
-        padding: 28,
-        animate: false,
-        fit: true,
-      }).run();
+      cy.layout(buildLayoutOptions(filters, false)).run();
     },
     destroy() {
       cy.destroy();
     },
+    optimizeLayout(filters) {
+      cy.layout(buildLayoutOptions(filters, true)).run();
+    },
+  };
+}
+
+function buildLayoutOptions(filters, animate) {
+  if (filters.viewMode === "package") {
+    return {
+      name: "breadthfirst",
+      directed: true,
+      padding: 32,
+      spacingFactor: 1.5,
+      animate,
+      fit: true,
+    };
+  }
+
+  return {
+    name: "cose",
+    animate,
+    fit: true,
+    padding: 32,
+    randomize: false,
+    componentSpacing: 120,
+    nodeRepulsion: 140000,
+    idealEdgeLength: 90,
+    edgeElasticity: 180,
+    nestingFactor: 0.85,
+    gravity: 1,
+    numIter: 1600,
   };
 }
 
